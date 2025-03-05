@@ -1,0 +1,112 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+*.egg
+.pytest_cache
+.mypy_cache
+.pyre_cache
+.pytype_cache
+*.cpython-*.opt-*.so
+*.pstats
+*.stat
+*.whl
+
+# Virtual environment
+venv/
+ENV/
+env/
+.venv/
+.env/
+.virtualenv/
+.virtualenvs/
+
+# Django specific
+*.log
+*.pot
+*.sqlite3
+*.db
+*.swp
+*.swo
+.DS_Store
+
+# Static and media files (adjust paths if needed)
+static/*
+!static/.git # Keep .git if you intend to track static files in Git (less common for collected static)
+media/*
+!media/.git # Keep .git if you intend to track media files in Git (less common for user uploads)
+
+# Bolt.new specific (adjust if Bolt.new generates specific files/folders)
+# node_modules/ # If Bolt.new uses npm/node_modules (less likely for typical Bolt.new projects)
+# dist/        # If Bolt.new has a build process and outputs to 'dist'
+# build/       # If Bolt.new has a build process and outputs to 'build'
+
+# OS or Editor related
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+*.DS_Store
+*.AppleDouble
+*.LSOverride
+
+# IDE - Specific files - adjust based on your IDE
+.idea/
+.vscode/
+*.project
+*.settings
+*.iml
+*.ipr
+*.iws
+*.bowerrc
+bower_components
+jspm_packages
+node_modules
+npm-debug.log
+yarn-error.log
+
+# Sensitive files - adjust as needed - consider using environment variables instead of files
+# secrets.json
+# config.ini
+# my_private_key.pem
+
+# Temporary files
+*~
+\#*\#
+*.bak
+*.tmp
+*.diff
+*.patch
+*.orig
+*.rej
+*.dump
+*.sql
+*.DS_Store?
