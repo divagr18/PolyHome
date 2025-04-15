@@ -9,6 +9,13 @@
       }
     },
     {
+      "src": "build_files.sh",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "staticfiles"
+      }
+    },
+    {
       "src": "backend/realestateassistant/wsgi.py",
       "use": "@vercel/python",
       "config": {

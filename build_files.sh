@@ -1,35 +1,24 @@
 #!/bin/bash
-set -e
 
-echo "=== Starting build_files.sh ==="
-
-# FRONTEND - Build the frontend using npm/yarn in frontend folder
-echo "Building frontend..."
-cd frontend
-
-# Install frontend deps (optional if cached)
-npm install
-
-# Run vite production build to create /frontend/dist folder
-npm run build
-
-cd ..
-
-# BACKEND - Setup Python environment
-echo "Installing Python dependencies..."
+# Create a Python virtual environment
+echo "Creating Python virtual environment..."
 python3 -m venv venv
 source venv/bin/activate
 
-# Upgrade pip and install requirements
-pip install --upgrade pip
-pip install -r backend/requirements.txt
+# Install Python dependencies
+echo "Installing Python dependencies..."
+python -m pip install --upgrade pip
 
-# Collect Django static files into staticfiles/static
-echo "Collecting Django static files..."
-cd backend
-source ../venv/bin/activate
-python manage.py collectstatic --noinput --clear --no-post-process
+# Install dependencies from requirements.txt
+echo "Installing requirements from requirements.txt..."
+pip install -r requirements.txt
 
-cd ..
+# Create staticfiles directory
+echo "Creating staticfiles directory..."
+mkdir -p staticfiles/static
 
-echo "Build complete!"
+# Create a simple placeholder file to ensure the directory exists
+echo "Creating placeholder file..."
+touch staticfiles/static/placeholder.txt
+
+echo "Build completed!"
