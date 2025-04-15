@@ -2,7 +2,12 @@ import React, { useState, useRef, useEffect } from 'react';
 import { SendHorizonal, Image as ImageIcon, X, Loader2 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import rehypeHighlight from 'rehype-highlight';
-
+interface HistoryItem {
+  role: 'user' | 'assistant'; // Use 'assistant' for agent responses
+  content: string;
+  // We will *not* send image data back in history for simplicity now
+  // Potentially add image info later if needed by backend/agents
+}
 // --- CORRECTED AGENTS ARRAY ---
 // Use the actual names sent by the backend API
 const AGENTS = [
@@ -76,27 +81,39 @@ const ChatStreamInterface: React.FC = () => {
     }
   }, [selectedImage]);
 
-   const handleSendMessage = async () => {
+  const handleSendMessage = async () => {
     const textToSend = inputText.trim();
     if (!textToSend && !selectedImage) return;
 
+    // --- Prepare history ---
+    const historyToSend: HistoryItem[] = messages
+      .filter(msg => !msg.isStreaming && msg.text) // Exclude streaming/empty placeholders
+      .map(msg => ({
+          role: msg.sender === 'user' ? 'user' : 'assistant', // Map 'agent' to 'assistant'
+          // For user messages that had an image, just send the text part for history
+          content: msg.text,
+      }));
+    // console.log("Sending History:", historyToSend); // Debug log
+
+    // --- Add user message to local state ---
+    const userMsgId = `user-${Date.now()}`;
     const userMsg: Message = {
-      id: `user-${Date.now()}`,
+      id: userMsgId,
       text: textToSend,
       sender: 'user',
       image: imagePreview || undefined,
     };
     setMessages(prev => [...prev, userMsg]);
     setInputText('');
-    // Clear image selection *after* adding user message which might need preview
     const imageToSend = selectedImage; // Keep a reference
     setSelectedImage(null);
     setImagePreview(null);
-    if (fileInputRef.current) fileInputRef.current.value = ''; // Clear file input
+    if (fileInputRef.current) fileInputRef.current.value = '';
 
     setIsLoading(true);
-    setActiveAgent(null); // Reset active agent display at start of new request
+    setActiveAgent(null);
 
+    // --- Add agent placeholder to local state ---
     const agentId = `agent-${Date.now()}`;
     setMessages(prev => [
       ...prev,
@@ -105,14 +122,18 @@ const ChatStreamInterface: React.FC = () => {
         text: '',
         sender: 'agent',
         isStreaming: true,
-        agentName: undefined // Initially no agent name assigned
+        agentName: undefined
       }
     ]);
 
+    // --- Prepare FormData ---
     const formData = new FormData();
-    formData.append('text', textToSend);
-    // Use the saved reference to the image file
-    if (imageToSend) formData.append('image', imageToSend);
+    formData.append('text', textToSend); // Current user text
+    if (imageToSend) {
+        formData.append('image', imageToSend); // Current user image
+    }
+    // Add history as a JSON string
+    formData.append('history', JSON.stringify(historyToSend));
 
     let eventSource: EventSource | null = null; // Using EventSource for cleaner SSE handling
 
@@ -137,43 +158,37 @@ const ChatStreamInterface: React.FC = () => {
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let isDone = false;
-        let buffer = ''; // Buffer for partial messages
+        let buffer = '';
         let fullText = '';
-        let agentNameFromServer: string | undefined; // Store the first agent name received
+        let agentNameFromServer: string | undefined;
 
         while (!isDone) {
             const { value, done } = await reader.read();
             isDone = done;
 
             if (value) {
-                // Append new data to buffer and process line by line
                 buffer += decoder.decode(value, { stream: true });
                 const lines = buffer.split('\n\n');
-
-                // Keep the last (potentially incomplete) message in the buffer
                 buffer = lines.pop() || '';
 
                 for (const event of lines) {
                     if (event.startsWith('event: end')) {
                         console.log("Received end event");
-                        isDone = true; // Explicit end signal
-                        break; // Exit inner loop if end event received
+                        isDone = true;
+                        break;
                     }
 
                     if (event.startsWith('data: ')) {
                         try {
                             const jsonData = event.substring(6);
-                            // console.log("Raw JSON data:", jsonData); // Debugging
                             const data = JSON.parse(jsonData);
 
-                            // --- Agent Name Handling ---
+                            // --- Agent Name Handling (No changes needed here) ---
                             if (data.agent && !agentNameFromServer) {
                                 agentNameFromServer = data.agent;
                                 const foundAgent = agentByName(data.agent);
-                                console.log(`Agent identified: ${data.agent}`, foundAgent); // Debugging
-                                setActiveAgent(foundAgent || null); // Update header
-
-                                // Update the specific message bubble's agentName for styling
+                                console.log(`Agent identified: ${data.agent}`, foundAgent);
+                                setActiveAgent(foundAgent || null);
                                 setMessages(prev =>
                                     prev.map(m =>
                                         m.id === agentId ? { ...m, agentName: data.agent } : m
@@ -181,27 +196,26 @@ const ChatStreamInterface: React.FC = () => {
                                 );
                             }
 
-                            // --- Delta Handling ---
+                            // --- Delta Handling (No changes needed here) ---
                             if (data.delta) {
                                 fullText += data.delta;
                                 setMessages((prev) =>
                                     prev.map((m) =>
                                         m.id === agentId
-                                            ? { ...m, text: fullText, agentName: agentNameFromServer } // Ensure agentName persists
+                                            ? { ...m, text: fullText, agentName: agentNameFromServer }
                                             : m
                                     )
                                 );
                             }
                         } catch (parseError) {
                             console.error("Error parsing SSE data:", parseError, "Data:", event);
-                            // Continue processing other events if possible
                         }
                     }
-                } // end for loop over events
-            } // end if(value)
-        } // end while loop
+                }
+            }
+        }
 
-        // Final buffer processing (if any data remains after stream ends)
+        // --- Final buffer processing (No changes needed here) ---
         if (buffer.startsWith('data: ')) {
            try {
                 const data = JSON.parse(buffer.substring(6));
@@ -218,9 +232,7 @@ const ChatStreamInterface: React.FC = () => {
            } catch (e) { console.error("Error parsing final buffer:", e, buffer) }
         }
 
-
         console.log("Stream finished.");
-        // Mark the specific agent message as done streaming
         setMessages(prev =>
             prev.map((m) =>
                 m.id === agentId ? { ...m, isStreaming: false } : m
@@ -228,15 +240,15 @@ const ChatStreamInterface: React.FC = () => {
         );
 
     } catch (e: any) {
+        // ... error handling ...
         console.error("Error during SSE fetch:", e);
-        // Update UI to show error message
         setMessages(prev => [
             ...prev.filter((m) => m.id !== agentId), // Remove placeholder
             {
                 id: `error-${Date.now()}`,
                 text: `Error: ${e.message || "Could not get response from the agent."}`,
                 sender: 'agent',
-                agentName: undefined // No specific agent for error message
+                agentName: undefined
             }
         ]);
     } finally {
