@@ -350,7 +350,7 @@ class MultiAgentChatStreamView(APIView):
             # --- Text-only path ---
             current_message_text = user_text
             input_list_for_agent.append({"role": "user", "content": current_message_text})
-
+            logger.info(user_text)
             logger.info("Text provided, running Triage Agent...")
             triage_agent_result = run_agent_sync(
                 starting_agent=triage_agent,
