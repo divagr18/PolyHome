@@ -22,29 +22,29 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// API endpoints
-export const messagesApi = {
-  getMessages: () => api.get('messages/'),
-  sendMessage: (text: string) => api.post('messages/', { text }),
-  getConversationSummary: (conversationId: number) => api.get(`conversations/${conversationId}/summary/`)
-};
 
-export const propertiesApi = {
-  getProperties: () => api.get('properties/'),
-  getProperty: (id: number) => api.get(`properties/${id}/`),
-  getRecommendedProperties: (clientId: number) => api.get(`clients/${clientId}/recommended-properties/`)
-};
+export default {
+  getChats: () => api.get('chat/'),
+  createChat: (data: { name: string }) => api.post('chat/', data),
+  getChatMessages: (chatId: number) => api.get(`chat/${chatId}/messages/`),
+  createChatMessage: (chatId: number, data: { content: string, sender: string }) => api.post(`chat/${chatId}/messages/`, data),
+  // Remove getProperty and getRecommendedProperties
+  // getProperty: (id: number) => api.get(`properties/${id}/`),
+  // getRecommendedProperties: (clientId: number) => api.get(`clients/${clientId}/recommended-properties/`),
 
-export const clientsApi = {
-  getClients: () => api.get('clients/'),
-  getClient: (id: number) => api.get(`clients/${id}/`),
-  createClient: (clientData: any) => api.post('clients/', clientData)
-};
 
-export const appointmentsApi = {
-  getAppointments: () => api.get('appointments/'),
-  createAppointment: (appointmentData: any) => api.post('appointments/', appointmentData),
-  updateAppointment: (id: number, appointmentData: any) => api.put(`appointments/${id}/`, appointmentData)
-};
+  // Add the new sendMessageToChatbot function later
+  sendMessageToChatbot: (message: string, image?: File): Promise<any> => {
+    const formData = new FormData();
+    formData.append('text', message);
+    if (image) {
+      formData.append('image', image);
+    }
 
-export default api;
+    return api.post('chat/message/', formData, { // Adjust endpoint if needed
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+  },
+};

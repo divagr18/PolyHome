@@ -1,23 +1,18 @@
 import React, { useState } from 'react';
 import { Routes, Route, useLocation, Link } from 'react-router-dom';
-import { MessageSquare, Home, Users, Calendar, Settings, Menu, X, ChevronRight, Building } from 'lucide-react';
+// Updated Icon imports - removed unused ones
+import { MessageSquare, Settings, Menu, X, ChevronRight, Home } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import ClientChatPage from './pages/ClientChatPage';
-import PropertiesPage from './pages/PropertiesPage';
-import ClientsPage from './pages/ClientsPage';
-import AppointmentsPage from './pages/AppointmentsPage';
+// Import the main chat interface page (will be created)
+import ChatInterface from './pages/ChatInterface';
 import SettingsPage from './pages/SettingsPage';
-import DashboardPage from './pages/DashboardPage';
 
 function App() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const location = useLocation();
 
   const sidebarLinks = [
-    { path: '/', icon: <Home size={20} />, text: 'Dashboard' },
-    { path: '/clients', icon: <Users size={20} />, text: 'Clients' },
-    { path: '/properties', icon: <Building size={20} />, text: 'Properties' },
-    { path: '/appointments', icon: <Calendar size={20} />, text: 'Appointments' },
+    { path: '/', icon: <MessageSquare size={20} />, text: 'Chat Assistant' }, // Link to the main chat
     { path: '/settings', icon: <Settings size={20} />, text: 'Settings' },
   ];
 
@@ -96,13 +91,8 @@ function App() {
             className="p-4 md:p-6 w-full"
           >
             <Routes>
-            <Route path="/" element={<DashboardPage />} />
-          <Route path="/clients" element={<ClientsPage />} />
-          <Route path="/clients/:clientId" element={<ClientsPage />} />
-          <Route path="/chat/:clientId" element={<ClientChatPage />} /> {/* Add this route! */}
-          <Route path="/properties" element={<PropertiesPage />} />
-          <Route path="/appointments" element={<AppointmentsPage />} />
-          <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/" element={<ChatInterface />} />
+            <Route path="/settings" element={<SettingsPage />} />
             </Routes>
           </motion.div>
         </AnimatePresence>

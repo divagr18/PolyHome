@@ -29,7 +29,12 @@ ALLOWED_HOSTS = []
 
 
 # Application definition
-
+import os
+from dotenv import load_dotenv
+load_dotenv() # Loads variables from .env into environment
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+if not OPENAI_API_KEY:
+    print("Warning: OPENAI_API_KEY not found in environment variables.")
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -38,29 +43,12 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'chat',
-    'clients',
-    'properties',
+    #'clients',
+    #'properties',
     'rest_framework', 
     'corsheaders',
-    'appointments',
+    #'appointments',
 ]
-LOGGING = {
-    'version': 1,
-    'disable_existing_loggers': False,
-    'handlers': {
-        'console': {
-            'class': 'logging.StreamHandler',
-        },
-    },
-    'loggers': {
-        'chat.serializers': {  # Replace 'your_app' with the name of your app
-            'handlers': ['console'],
-            'level': 'INFO',  # Set the logging level to INFO or DEBUG
-            'propagate': True,
-        },
-    },
-}
-
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -99,15 +87,8 @@ WSGI_APPLICATION = 'realestateassistant.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'realestate',  # Replace with your database name
-        'USER': 'root',      # Replace with your MySQL username
-        'PASSWORD': '1234',  # Replace with your MySQL password
-        'HOST': 'localhost',           # Or your MySQL host
-        'PORT': '3308',                # Or your MySQL port
-        'OPTIONS': {
-            'charset': 'utf8mb4',  # Recommended character set
-        },
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
 
