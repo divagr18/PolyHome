@@ -362,7 +362,7 @@ class MultiAgentChatStreamView(APIView):
             if triage_agent_result and hasattr(triage_agent_result, 'final_output') and triage_agent_result.final_output:
                 # Get the raw output, strip whitespace, convert to lower for robust comparison
                 triage_decision = triage_agent_result.final_output.strip().lower()
-                logger.debug(f"Triage agent raw output: '{triage_agent_result.final_output}', Processed decision: '{triage_decision}'")
+                logger.info(f"Triage agent raw output: '{triage_agent_result.final_output}', Processed decision: '{triage_decision}'")
 
                 # <<< CORRECTED ROUTING LOGIC >>>
                 # Check if the *exact agent name* (case-insensitive) is in the output
