@@ -107,7 +107,7 @@ issue_detector_agent = Agent[ChatContext](
         "If there is no new image, analyze the issue using the text description and conversation history. "
         "Do not add excess line breaks"
         "Provide a brief assessment and suggest next steps. Respond in Markdown."
-        "start your answer with 'Property Issue Expert:'in bold , then continue the first answer sentence in the same line. Break line after."
+        "start your answer with 'Property Issue Detector:'in bold , then continue the first answer sentence in the same line. Break line after."
     ),
     model="gpt-4o",
     tools=[analyze_property_image_tool]
