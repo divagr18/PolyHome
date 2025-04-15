@@ -5,7 +5,6 @@ import { MessageSquare, Settings, Menu, X, ChevronRight, Home } from 'lucide-rea
 import { motion, AnimatePresence } from 'framer-motion';
 // Import the main chat interface page (will be created)
 import ChatInterface from './pages/ChatInterface';
-import SettingsPage from './pages/SettingsPage';
 
 function App() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -13,7 +12,6 @@ function App() {
 
   const sidebarLinks = [
     { path: '/', icon: <MessageSquare size={20} />, text: 'Chat Assistant' }, // Link to the main chat
-    { path: '/settings', icon: <Settings size={20} />, text: 'Settings' },
   ];
 
   return (
@@ -92,7 +90,6 @@ function App() {
           >
             <Routes>
             <Route path="/" element={<ChatInterface />} />
-            <Route path="/settings" element={<SettingsPage />} />
             </Routes>
           </motion.div>
         </AnimatePresence>

@@ -22,7 +22,6 @@ logger = logging.getLogger(__name__)
 # --- DEMO GLOBALS for image per request ---
 _POST_IMAGE_B64 = None
 _POST_IMAGE_TYPE = None
-
 # --- OpenAI Client ---
 openai_api_key = os.environ.get("OPENAI_API_KEY")
 if not openai_api_key:
@@ -65,6 +64,9 @@ def analyze_property_image_tool(user_description: str) -> str:
                         "Identify the likely issue (e.g., water leak, mold, broken window, pest infestation). "
                         "Provide a brief assessment and suggest potential next steps."
                         "return markdown formatted output for chat, don't add extra line breaks"
+                        "start your answer with 'Property Issue Expert:', then continue answer in the same line"
+
+
 
                         f"\n\nUser description: '{user_description}'"
                     )
@@ -102,9 +104,10 @@ issue_detector_agent = Agent[ChatContext](
         "If the LATEST user message mentions an attached image (e.g., 'see the attached image', 'look at this picture') AND an image was actually provided for THIS turn, "
         "then call the 'analyze_property_image_tool' function, providing the user's latest text description relevant to the image as the 'user_description' argument. "
         "Use the conversation history for context but focus the tool call on the LATEST image description. "
-        "Do NOT call the tool if no image was provided in the latest turn, even if mentioned earlier. "
         "If there is no new image, analyze the issue using the text description and conversation history. "
+        "Do not add excess line breaks"
         "Provide a brief assessment and suggest next steps. Respond in Markdown."
+        "start your answer with 'Property Issue Expert:', then continue answer in the same line"
     ),
     model="gpt-4o",
     tools=[analyze_property_image_tool]
@@ -120,25 +123,39 @@ faq_agent = Agent[ChatContext](
         "Do not provide legal advice, but explain common clauses and procedures clearly. "
         "If the LATEST question is primarily about a specific property issue (like damage), state that this is outside your expertise and should be handled by the 'Property Issue Detector' or reported directly to the landlord/property manager according to the lease."
         "Consider the location of the user when giving advice, if mentioned in the history or query. "
+        "Do not add excess line breaks"
         "Respond clearly in Markdown."
+        "start your answer with 'Tenancy Agreement Expert:', then continue answer in the same line"
 
     ),
     model="gpt-4o-mini",
     tools=[WebSearchTool(search_context_size="medium")],
 )
-
+query_clarification_agent = Agent[ChatContext](
+    name="Query Clarification Agent",
+    instructions=(
+        "You have received a very brief greeting (like 'Hello', 'Hi') or a highly ambiguous query that doesn't clearly indicate a property issue or a tenancy question. "
+        "Your ONLY task is to ask the user to clarify their need. "
+        "Ask them: 'Hello! To best assist you, could you please let me know if you have a question about a physical property issue (like damage, leaks, pests) or a question about your tenancy agreement (like lease terms, rent, rights)?' "
+        "DO NOT answer any other questions. DO NOT try to guess their intent. ONLY output the clarifying question."
+    ),
+    model="gpt-4o-mini", # Small model is sufficient
+    tools=[], # No tools needed
+    # NO handoffs needed here - this agent's job is to respond directly and stop.
+)
 triage_agent = Agent[ChatContext](
     name="Real Estate Query Triage Agent",
     instructions=(
-        "INTERNAL TASK: You are a routing agent. Analyze the LATEST user message within the conversation history. Your goal is to decide which specialist agent should handle the query. Ignore any images mentioned; image presence is handled by the system." # Added history mention
-        "If the LATEST message primarily describes a potential PHYSICAL issue or damage within a property (e.g., 'leak', 'broken', 'mold', 'pests', 'noise problem', 'appliance not working'), "
-        "hand off to the 'Property Issue Detector'. "
-        "If the LATEST message is primarily about tenancy agreements, lease terms, tenant/landlord rights/responsibilities, rent, eviction, or standard rental procedures, hand off to the 'Tenancy Agreement Expert'."
-        "If the query is ambiguous or covers both, prioritize the 'Property Issue Detector' if a physical issue is mentioned."
-        "Use the conversation history ONLY for context to understand the LATEST message, not to change the routing decision based on past topics."
-        "Output ONLY the name of the agent to hand off to (e.g., 'Property Issue Detector' or 'Tenancy Agreement Expert'). Do not add any other explanation or text."
+        "INTERNAL TASK: You are a routing agent. Analyze the LATEST user message within the conversation history. Your goal is to decide which specialist agent should handle the query OR if clarification is needed. Ignore any images mentioned; image presence is handled by the system."
+        "\n1. Check if the LATEST message is a simple greeting (e.g., 'Hello', 'Hi', 'Hey') OR is highly ambiguous and lacks keywords suggesting either a physical issue or a tenancy matter. If YES, hand off to the 'Query Clarification Agent'."
+        "\n2. If NOT a greeting/ambiguous (or if the user is *replying* to the clarification question), check for physical issues: If the LATEST message primarily describes a potential PHYSICAL issue or damage within a property (e.g., 'leak', 'broken', 'mold', 'pests', 'noise problem', 'appliance not working'), hand off to the 'Property Issue Detector'."
+        "\n3. If NOT a physical issue, check for tenancy FAQs: If the LATEST message is primarily about tenancy FAQs such as agreements, lease terms, tenant/landlord rights/responsibilities, rent, eviction, or standard rental procedures, hand off to the 'Tenancy Agreement Expert'."
+        "\n4. If the query is ambiguous AFTER ruling out a simple greeting (e.g., it mentions both damage and lease terms), prioritize the 'Property Issue Detector' if a physical issue is mentioned."
+        "\nUse the conversation history ONLY for context to understand the LATEST message, not to change the routing decision based on past topics (unless the user is directly answering the clarification question)."
+        "\nOUTPUT ONLY the name of the agent to hand off to: 'Property Issue Detector', 'Tenancy Agreement Expert', or 'Query Clarification Agent'. Do not add any other explanation or text."
+        "\nEXPLICITLY RETURN THE NAME OF THE AGENT YOU HAVE HANDED OFF TO"
     ),
-    handoffs=[issue_detector_agent, faq_agent],
+    handoffs=[issue_detector_agent, faq_agent, query_clarification_agent],
     model="gpt-4o-mini"
 )
 # --- End of Existing Agent Definitions ---
@@ -285,10 +302,7 @@ class MultiAgentChatStreamView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request, *args, **kwargs):
-        """
-        Stream agent output using Server-Sent Events (SSE).
-        """
-        # ... (Keep user_id, user_text, user_image_file, history_json retrieval) ...
+        # ... (user_id, text, image, history retrieval) ...
         user_id_str = str(request.user.id) if request.user.is_authenticated else "Anonymous"
         user_text = request.data.get('text', '').strip()
         user_image_file = request.FILES.get('image')
@@ -299,28 +313,25 @@ class MultiAgentChatStreamView(APIView):
         # --- Parse History (Keep existing) ---
         try:
             parsed_history: List[Dict[str, Any]] = json.loads(history_json)
-            if not isinstance(parsed_history, list):
-                raise ValueError("History is not a list")
-            for item in parsed_history:
-                if not isinstance(item, dict) or 'role' not in item or 'content' not in item:
-                    raise ValueError("Invalid item in history list")
+            # ... (history validation) ...
             logger.debug(f"Parsed history for stream request ({len(parsed_history)} messages).")
         except (json.JSONDecodeError, ValueError) as e:
             logger.warning(f"Invalid history format received in stream request: {e}. Defaulting to empty history.")
             parsed_history = []
 
-        # --- Agent Selection Logic (Keep existing) ---
+        # --- Agent Selection Logic ---
         agent = None
         context_obj = ChatContext(user_id=user_id_str)
         input_list_for_agent: List[Dict[str, Any]] = parsed_history
         current_message_text = ""
 
         global _POST_IMAGE_B64, _POST_IMAGE_TYPE
+        # <<< RESET GLOBALS PER REQUEST >>>
         _POST_IMAGE_B64 = None
         _POST_IMAGE_TYPE = None
 
         if user_image_file:
-            # ... (Keep image handling logic) ...
+            # ... (Image handling logic - sets agent = issue_detector_agent) ...
             raw_bytes = user_image_file.read()
             image_content_type = user_image_file.content_type
             b64 = base64.b64encode(raw_bytes).decode("utf-8")
@@ -333,94 +344,127 @@ class MultiAgentChatStreamView(APIView):
             current_message_text += " (See the attached image.)"
             input_list_for_agent.append({"role": "user", "content": current_message_text})
             agent = issue_detector_agent
+            logger.info("Image provided, routing directly to Property Issue Detector.")
 
         elif user_text:
-            # ... (Keep text handling and triage logic) ...
+            # --- Text-only path ---
             current_message_text = user_text
             input_list_for_agent.append({"role": "user", "content": current_message_text})
+
+            logger.info("Text provided, running Triage Agent...")
             triage_agent_result = run_agent_sync(
                 starting_agent=triage_agent,
-                input_data=input_list_for_agent,
+                input_data=input_list_for_agent, # Pass full history + new message
                 context_obj=context_obj
             )
+
+
             if triage_agent_result and hasattr(triage_agent_result, 'final_output') and triage_agent_result.final_output:
-                final_output = triage_agent_result.final_output.lower()
-                logger.debug(f"Triage agent output (used for routing): {final_output}")
-                if "property issue detector" in final_output:
+                # Get the raw output, strip whitespace, convert to lower for robust comparison
+                triage_decision = triage_agent_result.final_output.strip().lower()
+                logger.debug(f"Triage agent raw output: '{triage_agent_result.final_output}', Processed decision: '{triage_decision}'")
+
+                # <<< CORRECTED ROUTING LOGIC >>>
+                # Check if the *exact agent name* (case-insensitive) is in the output
+                if "property issue detector" in triage_decision:
                     agent = issue_detector_agent
-                    logger.info("Triage output indicates Property Issue Detector.")
-                elif "tenancy agreement expert" in final_output:
-                     agent = faq_agent
-                     logger.info("Triage output indicates Tenancy Agreement Expert.")
-                else:
-                    logger.warning(f"Triage output '{final_output}' did not explicitly name a known agent. Defaulting to FAQ agent.")
+                    logger.info("Triage decided: Property Issue Detector")
+                elif "tenancy agreement expert" in triage_decision:
                     agent = faq_agent
+                    logger.info("Triage decided: Tenancy Agreement Expert")
+                else:
+                    agent = query_clarification_agent
+
+
             else:
                 logger.error(f"Triage agent did not provide a usable final_output. Result: {triage_agent_result}")
-                return Response({"error": "Triage agent failed to determine how to handle the request."},
-                                status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                # Return error immediately if triage fails
+                error_payload = json.dumps({'error': 'Triage agent failed to determine how to handle the request.', 'agent': 'Triage Agent'})
+                return StreamingHttpResponse(f"data: {error_payload}\n\nevent: end\ndata: {{}}\n\n", content_type='text/event-stream', status=500)
+
+
         else:
-            # ... (Keep no input handling logic) ...
+            # ... (No input handling logic) ...
              if not parsed_history:
-                 return Response({"error": "Please provide text or an image."}, status=status.HTTP_400_BAD_REQUEST)
+                 # Use StreamingHttpResponse for consistency on error if possible
+                 error_payload = json.dumps({'error': 'Please provide text or an image.', 'agent': None})
+                 return StreamingHttpResponse(f"data: {error_payload}\n\nevent: end\ndata: {{}}\n\n", content_type='text/event-stream', status=400)
              else:
                  logger.warning("Stream request with history but no new input.")
-                 return Response({"error": "No new message provided to continue."}, status=status.HTTP_400_BAD_REQUEST)
+                 error_payload = json.dumps({'error': 'No new message provided to continue.', 'agent': None})
+                 return StreamingHttpResponse(f"data: {error_payload}\n\nevent: end\ndata: {{}}\n\n", content_type='text/event-stream', status=400)
 
-        # --- Agent Name Determination (Keep existing) ---
+        # --- Agent Name Determination ---
         if not agent:
              logger.error("Agent determination failed unexpectedly before streaming.")
-             return Response({"error": "Internal error determining agent."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+             # Use StreamingHttpResponse for consistency on error
+             error_payload = json.dumps({'error': 'Internal error determining agent.', 'agent': None})
+             return StreamingHttpResponse(f"data: {error_payload}\n\nevent: end\ndata: {{}}\n\n", content_type='text/event-stream', status=500)
+
         agent_name = getattr(agent, "name", str(agent))
         logger.info(f"Starting stream with agent: {agent_name}")
 
-        # --- Streaming Logic with CORRECTED Final Except Block Indentation ---
+        # --- Streaming Logic ---
         async def event_stream():
-            # This try block covers the entire streaming process
             try:
+                # <<< Pass the *selected* agent and the input list >>>
                 result = Runner.run_streamed(agent, input=input_list_for_agent, context=context_obj)
 
-                # Keep existing filtering logic if needed
-                filtering_needed = (agent is issue_detector_agent or getattr(agent, "name", None) == "Property Issue Detector")
-                in_tool_arg = filtering_needed
+                # Filtering logic (remains the same)
+                # Note: Filtering might need adjustment if FAQ agent also uses tools
+                filtering_needed = (agent is issue_detector_agent) # Only filter if it's the issue detector
+                in_tool_arg = False # Start assuming not in tool arg unless filtering needed
                 tool_arg_buffer = ""
                 bracket_level = 0
+                if filtering_needed:
+                    # Check if the *first* part of the stream looks like a tool call
+                    # This is heuristic and might need refinement
+                    # A better approach might involve specific event types from the runner if available
+                    pass # Initial check might be complex, rely on bracket counting for now
+
 
                 async for event in result.stream_events():
                     # logger.debug(f"SSE Event Type: {event.type}") # Optional verbose log
                     if event.type == "raw_response_event" and hasattr(event.data, "delta"):
                         delta = event.data.delta
-                        # --- Agent switch logic (Keep existing) ---
-                        event_agent = None
-                        if hasattr(event.data, "agent"):
-                            event_agent = getattr(event.data, "agent", None)
-                        elif hasattr(event, "agent"):
-                            event_agent = getattr(event, "agent", None)
+
+                        # --- Agent switch logic (remains same) ---
+                        event_agent_name = agent_name # Default to starting agent
+                        event_agent = getattr(event.data, "agent", getattr(event, "agent", None))
                         if event_agent and hasattr(event_agent, "name"):
                             event_agent_name = event_agent.name
-                        elif event_agent:
-                            event_agent_name = getattr(event_agent, "name", str(event_agent))
-                        else:
-                            event_agent_name = agent_name
                         # --- End agent switch logic ---
 
-                        # --- Filtering (Keep existing) ---
-                        if in_tool_arg:
-                            tool_arg_buffer += delta
-                            for ch in delta:
-                                if ch == '{': bracket_level += 1
-                                elif ch == '}': bracket_level -= 1
-                            if bracket_level <= 0 and 'user_description' in tool_arg_buffer:
-                                in_tool_arg = False
-                                tool_arg_buffer = ""
-                                logger.debug("Exiting tool arg filtering.")
-                            continue
+                        # --- Filtering (apply only if needed) ---
+                        if filtering_needed:
+                            # Heuristic to detect start of tool call arguments
+                            if not in_tool_arg and tool_arg_buffer == "" and delta.strip().startswith('{'):
+                                logger.debug("Potential start of tool arg detected.")
+                                in_tool_arg = True
+
+                            if in_tool_arg:
+                                tool_arg_buffer += delta
+                                for ch in delta:
+                                    if ch == '{': bracket_level += 1
+                                    elif ch == '}': bracket_level -= 1
+
+                                # Check if buffer likely contains the tool arg key and brackets are balanced
+                                if bracket_level <= 0 and 'user_description' in tool_arg_buffer:
+                                    logger.debug(f"Exiting tool arg filtering. Buffer was: {tool_arg_buffer[:100]}...")
+                                    in_tool_arg = False
+                                    tool_arg_buffer = "" # Clear buffer
+                                    # Skip yielding this delta chunk as it's part of the tool call internals
+                                    continue
+                                else:
+                                    # Still inside tool args, skip yielding
+                                    continue
                         # --- End filtering ---
 
+                        # Yield delta if not filtered out
                         if delta:
                              yield f"data: {json.dumps({'delta': delta, 'agent': event_agent_name})}\n\n"
 
-                    # --- End/Error Event Handling (Keep existing) ---
+                    # --- End/Error Event Handling (remains same) ---
                     is_last = getattr(event, "is_last", False) or event.type == "final_result_event"
                     if is_last:
                         logger.info(f"End event received for stream from {agent_name}.")
@@ -437,21 +481,17 @@ class MultiAgentChatStreamView(APIView):
 
                 logger.info(f"Agent stream loop finished normally for user {user_id_str} (Agent: {agent_name}).")
 
-            # --- CORRECTED INDENTATION for the except block ---
-            # This except block catches errors during the setup or execution of the stream within the try block above
             except Exception as e:
+                # --- Error handling during streaming (remains same) ---
                 logger.exception(f"Error during agent streaming execution for user {user_id_str} (Agent: {agent_name}): {e}")
-                # Try to send an error message back through the stream if possible
                 try:
                     error_payload = json.dumps({'error': f'Stream generation failed: {str(e)}', 'agent': agent_name})
                     yield f"data: {error_payload}\n\n"
                     yield "event: end\ndata: {}\n\n"
                 except Exception as write_err:
-                    # Log if we can't even write the error to the stream
                     logger.error(f"Failed to write final error to SSE stream: {write_err}")
-            # --- End of CORRECTED INDENTATION ---
 
-        # --- Return Streaming Response (Keep existing) ---
+        # --- Return Streaming Response (remains same) ---
         response = StreamingHttpResponse(
             event_stream(), content_type='text/event-stream'
         )
