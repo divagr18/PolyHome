@@ -35,8 +35,6 @@ export default {
 
   createChat: (data: { name: string }) => api.post('chat/', data), 
 
-  getChatMessages: (chatId: number) => api.get(`chat/${chatId}/messages/`),
-
   createChatMessage: (chatId: number, data: { content: string, sender: string }) =>
     api.post(`chat/${chatId}/messages/`, data),
 

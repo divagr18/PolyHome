@@ -25,7 +25,7 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'a-default-key-for-local-but-not-produ
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'False').lower() == 'true'
 
-ALLOWED_HOSTS = ["https://poly-home.vercel.app/"]
+ALLOWED_HOSTS = ['https://poly-home.vercel.app/','polyhome-backend.onrender.com']
 STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles_build') # A dedicated build output folder
 # Application definition
