@@ -3,13 +3,13 @@
   "builds": [
     {
       "src": "frontend/package.json",
-      "use": "@vercel/static-build", 
+      "use": "@vercel/static-build",
       "config": {
         "distDir": "dist"
       }
     },
     {
-      "src": "build_files.sh",      
+      "src": "build_files.sh",
       "use": "@vercel/static-build",
       "config": {
         "zeroConfig": true
@@ -18,19 +18,15 @@
   ],
   "routes": [
     {
-      "src": "/api/(.*)",     
-      "dest": "/api/index.py"  
+      "src": "/api/(.*)",
+      "dest": "/api/index.py"
     },
     {
-       "src": "/assets/(.*)",
-       "dest": "/assets/$1"
-     },
-    {
-      "handle": "filesystem" 
+      "handle": "filesystem"
     },
     {
-      "src": "/(.*)", 
-      "dest": "/index.html"  
+      "src": "/(.*)",
+      "dest": "/index.html"
     }
   ]
 }
