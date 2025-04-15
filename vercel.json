@@ -1,39 +1,31 @@
 {
   "version": 2,
-  "builds": [
-    {
-      "src": "frontend/package.json",
-      "use": "@vercel/static-build",
-      "config": {
-        "distDir": "dist"
-      }
-    },
-    {
-      "src": "backend/realestateassistant/wsgi.py",
-      "use": "@vercel/python",
-      "config": {
-        "maxLambdaSize": "15mb",
-        "runtime": "python3.9"
-      }
-    }
-  ],
+
   "routes": [
+
+    {
+      "src": "/static/(.*)",
+      "dest": "/staticfiles/$1"
+    },
+
     {
       "src": "/api/(.*)",
       "dest": "/backend/realestateassistant/wsgi.py"
     },
 
     {
-      "handle": "filesystem"
-    },
-
-    {
       "src": "/(.*)",
-      "dest": "/index.html"
+      "dest": "/frontend/dist/index.html"
     }
   ],
   "env": {
     "DJANGO_SETTINGS_MODULE": "realestateassistant.settings"
-
   }
+
+    ,"functions": {
+      "backend/realestateassistant/wsgi.py": {
+        "runtime": "python3.9",
+        "maxLambdaSize": "15mb"
+      }
+    }
 }

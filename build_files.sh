@@ -1,31 +1,34 @@
-#!/bin/bash
-set -e
+*   **`build_vercel.sh`:**
+    ```bash
+    #!/bin/bash
 
-echo "=== Starting build_files.sh ==="
+    # Exit immediately if a command exits with a non-zero status.
+    set -e
 
-# Install frontend deps (optional if cached)
-npm install
+    echo "=== Starting Vercel Build Script ==="
 
-# Run vite production build to create /frontend/dist folder
-npm run build
+    # 1. Build Frontend
+    echo "Building frontend..."
+    # Navigate to frontend, install deps, build, return to root
+    cd frontend
+    npm install
+    npm run build
+    cd ..
 
-cd ..
+    # 2. Install Backend Dependencies (using the Python version specified for Vercel)
+    echo "Installing Python dependencies..."
+    # Use python3.9 as specified in your vercel.json runtime
+    python3.9 -m venv venv
+    source venv/bin/activate
+    pip install --upgrade pip
+    pip install -r backend/requirements.txt
 
-# BACKEND - Setup Python environment
-echo "Installing Python dependencies..."
-python3 -m venv venv
-source venv/bin/activate
+    # 3. Collect Django Static Files
+    echo "Collecting Django static files..."
+    # Run collectstatic from the root, targeting the backend manage.py
+    # Ensure STATIC_ROOT is configured correctly in settings.py
+    # This command assumes STATIC_ROOT is set, e.g., to 'staticfiles'
+    python backend/manage.py collectstatic --noinput --clear
 
-# Upgrade pip and install requirements
-pip install --upgrade pip
-pip install -r backend/requirements.txt
-
-# Collect Django static files into staticfiles/static
-echo "Collecting Django static files..."
-cd backend
-source ../venv/bin/activate
-python manage.py collectstatic --noinput --clear --no-post-process
-
-cd ..
-
-echo "Build complete!"
+    echo "Build complete!"
+    ```
