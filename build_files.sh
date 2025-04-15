@@ -1,21 +1,21 @@
 #!/bin/bash
-echo "Build Script Starting..."
-# Ensure script exits immediately if any command fails
-set -e
 
-# Upgrade pip if necessary
-# python -m pip install --upgrade pip
+# Create a Python virtual environment
+echo "Creating Python virtual environment..."
+python3 -m venv venv
+source venv/bin/activate
 
-# Install Python dependencies listed in requirements.txt
+# Install Python dependencies
 echo "Installing Python dependencies..."
+python -m pip install --upgrade pip
 pip install -r requirements.txt
 
-# Create the directory for Django's collectstatic (even if not directly served)
-echo "Preparing staticfiles directory..."
-mkdir -p staticfiles_build
-
-# Run Django's collectstatic
+# Run Django collectstatic
 echo "Running collectstatic..."
-python manage.py collectstatic --noinput --clear
+python backend/manage.py collectstatic --noinput --clear
 
-echo "Build Script Finished."
+# Create staticfiles directory if it doesn't exist
+mkdir -p staticfiles/static
+
+# Copy collected static files to the staticfiles directory
+cp -r backend/staticfiles/* staticfiles/

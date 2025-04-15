@@ -31,7 +31,7 @@
     },
     {
       "src": "/api/(.*)",
-      "dest": "/backend/realestateassistant/wsgi.py"
+      "dest": "backend/realestateassistant/wsgi.py"
     },
     {
       "handle": "filesystem"
