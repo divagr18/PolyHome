@@ -1,5 +1,0 @@
-{
-  "scripts": {
-    "vercel-build": "npm --prefix frontend install && npm --prefix frontend run build && python -m venv venv && source venv/Scripts/activate && pip install -r backend/requirements.txt && python backend/manage.py collectstatic --noinput"
-  }
-}

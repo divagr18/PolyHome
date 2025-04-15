@@ -19,22 +19,21 @@
   ],
   "routes": [
     {
-      "src": "/static/(.*)",
-      "dest": "/staticfiles/static/$1"
-    },
-    {
       "src": "/api/(.*)",
       "dest": "/backend/realestateassistant/wsgi.py"
     },
+
     {
       "handle": "filesystem"
     },
+
     {
       "src": "/(.*)",
-      "dest": "/frontend/dist/index.html"
+      "dest": "/index.html"
     }
   ],
   "env": {
     "DJANGO_SETTINGS_MODULE": "realestateassistant.settings"
+
   }
 }
