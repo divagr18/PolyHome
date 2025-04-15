@@ -1,18 +1,14 @@
 {
   "version": 2,
-
   "routes": [
-
     {
       "src": "/static/(.*)",
       "dest": "/staticfiles/$1"
     },
-
     {
       "src": "/api/(.*)",
       "dest": "/backend/realestateassistant/wsgi.py"
     },
-
     {
       "src": "/(.*)",
       "dest": "/frontend/dist/index.html"
@@ -20,12 +16,10 @@
   ],
   "env": {
     "DJANGO_SETTINGS_MODULE": "realestateassistant.settings"
-  }
-
-    ,"functions": {
-      "backend/realestateassistant/wsgi.py": {
-        "runtime": "python3.9",
-        "maxLambdaSize": "15mb"
-      }
+  },
+  "functions": {
+    "backend/realestateassistant/wsgi.py": {
+      "runtime": "python3.9"
     }
+  }
 }
