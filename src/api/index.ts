@@ -1,20 +1,19 @@
 import axios from 'axios';
 
-// Create an axios instance with default config
 const api = axios.create({
-  baseURL: 'http://localhost:8000/api/',  // Default Django backend URL
+  baseURL: 'http://localhost:8000/api/', // Or your Django backend URL
   timeout: 10000,
   headers: {
-    'Content-Type': 'application/json',
-    'Accept': 'application/json'
-  }
+    'Accept': 'application/json',
+  },
 });
 
-// Add request interceptor for authentication
+// Optional: add auth token to all requests
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('authToken');
     if (token) {
+      config.headers = config.headers || {};
       config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
@@ -23,27 +22,43 @@ api.interceptors.request.use(
 );
 
 
+// Classic REST calls (still using axios)
 export default {
   getChats: () => api.get('chat/'),
   createChat: (data: { name: string }) => api.post('chat/', data),
   getChatMessages: (chatId: number) => api.get(`chat/${chatId}/messages/`),
-  createChatMessage: (chatId: number, data: { content: string, sender: string }) => api.post(`chat/${chatId}/messages/`, data),
-  // Remove getProperty and getRecommendedProperties
-  // getProperty: (id: number) => api.get(`properties/${id}/`),
-  // getRecommendedProperties: (clientId: number) => api.get(`clients/${clientId}/recommended-properties/`),
+  createChatMessage: (chatId: number, data: { content: string, sender: string }) =>
+    api.post(`chat/${chatId}/messages/`, data),
 
-
-  // Add the new sendMessageToChatbot function later
-  sendMessageToChatbot: (message: string, image?: File): Promise<any> => {
+  // For non-streaming chatbot message (rarely used, kept for reference)
+  sendMessageToChatbotForm: (message: string, image?: File): Promise<any> => {
     const formData = new FormData();
     formData.append('text', message);
     if (image) {
       formData.append('image', image);
     }
+    // NOTE: Do not set Content-Type header manually for FormData in axios! It handles it.
+    return api.post('chat/message/', formData);
+  },
 
-    return api.post('chat/message/', formData, { // Adjust endpoint if needed
+  // **For streaming agent chat, use fetch!**
+  sendMessageToChatbotStream: (
+    message: string,
+    image?: File
+  ): Promise<Response> => {
+    const formData = new FormData();
+    formData.append('text', message);
+    if (image) {
+      formData.append('image', image);
+    }
+    // It's important to NOT set the Content-Type header here: fetch + FormData does it for you
+    return fetch('http://localhost:8000/api/multiagent/stream/', {
+      method: 'POST',
+      body: formData,
+      credentials: 'include', // optional, for Django auth
       headers: {
-        'Content-Type': 'multipart/form-data',
+        // 'Accept': 'text/event-stream', // Not required, but for clarity if needed
+        // Do not set Content-Type
       },
     });
   },

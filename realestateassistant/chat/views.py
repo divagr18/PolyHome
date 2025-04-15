@@ -7,7 +7,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions
 from rest_framework.parsers import MultiPartParser, FormParser
-from agents import Agent, Runner, function_tool
+from agents import Agent, Runner, function_tool, WebSearchTool
 from pydantic import BaseModel
 from typing import Optional
 
@@ -39,7 +39,6 @@ def analyze_property_image_tool(user_description: str) -> str:
     global _POST_IMAGE_B64, _POST_IMAGE_TYPE
     b64_image = _POST_IMAGE_B64
     content_type = _POST_IMAGE_TYPE
-    logger.debug(f"[TOOL] user_description: {user_description}")
     logger.debug(f"[TOOL] b64_image: {'<present>' if b64_image else None}")
     logger.debug(f"[TOOL] content_type: {content_type}")
     if not b64_image or not content_type:
@@ -63,6 +62,8 @@ def analyze_property_image_tool(user_description: str) -> str:
                         "Analyze the user's description and the provided image. "
                         "Identify the likely issue (e.g., water leak, mold, broken window, pest infestation). "
                         "Provide a brief assessment and suggest potential next steps."
+                        "return markdown formatted output for chat, don't add extra line breaks"
+
                         f"\n\nUser description: '{user_description}'"
                     )
                 },
@@ -97,6 +98,7 @@ issue_detector_agent = Agent[ChatContext](
         "Do NOT provide any other arguments; the system will automatically use the attached image. "
         "If there is no image, analyze the issue using only the text."
         "In either case, provide a brief assessment and suggest next steps."
+        "return markdown formatted output for chat, don't add extra line breaks"
     ),
     model="gpt-4o",
     tools=[analyze_property_image_tool]
@@ -105,13 +107,17 @@ issue_detector_agent = Agent[ChatContext](
 faq_agent = Agent[ChatContext](
     name="Tenancy Agreement Expert",
     instructions=(
-        "You are an expert on standard tenancy agreements and common landlord-tenant questions. "
+         "You are an expert on standard tenancy agreements and common landlord-tenant questions. "
+        "You may use web search to look up current laws, local rules, or current events if asked, or whenever you do not know the answer from your own knowledge. "
         "Answer the user's query based on general knowledge of typical rental agreements and tenant rights/responsibilities. "
         "Do not provide legal advice, but explain common clauses and procedures clearly. "
         "If the question is about a specific property issue (like damage), state that another specialist should handle it."
-        "Consider the locatiion of the user when giving advice."
+        "Consider the location of the user when giving advice."
+        "return markdown formatted output for chat, don't add excessive line breaks"
+        
     ),
-    model="gpt-4o-mini"
+    model="gpt-4o-mini",
+    tools=[WebSearchTool(search_context_size="medium")],
 )
 
 triage_agent = Agent[ChatContext](
@@ -122,6 +128,7 @@ triage_agent = Agent[ChatContext](
         "hand off to the 'Property Issue Detector'. "
         "If it's about tenancy agreements/rules/processes, hand off to the 'Tenancy Agreement Expert'. "
         "Be decisive based ONLY on the text."
+
     ),
     handoffs=[issue_detector_agent, faq_agent],
     model="gpt-4o-mini"
@@ -200,3 +207,106 @@ class MultiAgentChatView(APIView):
         except Exception as e:
             logger.exception(f"User {user_id_str}: An unexpected error occurred during agent processing.")
             return Response({"error": f"An internal server error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+from django.http import StreamingHttpResponse
+from rest_framework.permissions import AllowAny
+from openai.types.responses import ResponseTextDeltaEvent
+import re
+import asyncio, json
+
+class MultiAgentChatStreamView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request, *args, **kwargs):
+        """
+        Stream agent output using Server-Sent Events (SSE).
+        """
+        user_id_str = str(request.user.id) if request.user.is_authenticated else "Anonymous"
+        user_text = request.data.get('text', '').strip()
+        user_image_file = request.FILES.get('image')
+        agent = None
+        context_obj = ChatContext(user_id=user_id_str)
+        input_for_agent = user_text
+        global _POST_IMAGE_B64, _POST_IMAGE_TYPE
+        _POST_IMAGE_B64 = None
+        _POST_IMAGE_TYPE = None
+        
+        if user_image_file:
+            raw_bytes = user_image_file.read()
+            image_content_type = user_image_file.content_type
+            b64 = base64.b64encode(raw_bytes).decode("utf-8")
+            _POST_IMAGE_B64 = b64
+            _POST_IMAGE_TYPE = image_content_type
+            
+            if not user_text:
+                user_text = "See the attached image."
+            input_for_agent = user_text + " (See the attached image.)"
+            agent = issue_detector_agent
+        elif user_text:
+            # Use the triage agent to determine the appropriate agent
+            triage_agent_result = run_agent_sync(
+                starting_agent=triage_agent,
+                input_text=user_text,
+                context_obj=context_obj
+            )   
+
+            # Log the triage agent's result
+            if hasattr(triage_agent_result, 'final_output'):
+                final_output = triage_agent_result.final_output.lower()
+                logger.debug(f"Triage agent output: {final_output}")  # Log the triage output
+                
+                # Define the conditions based on the final output
+                if "property issue" in final_output:  # Condition to check for a specific phrase
+                    agent = issue_detector_agent
+                else:
+                    agent = faq_agent
+            else:
+                return Response({"error": "Triage agent did not provide an output."},
+                                status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        else:
+            return Response({"error": "Please provide text or an image."},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        # Get the agent name string
+        agent_name = getattr(agent, "name", str(agent))
+
+        async def event_stream():
+                result = Runner.run_streamed(agent, input=input_for_agent, context=context_obj)
+                filtering_needed = (agent is issue_detector_agent or getattr(agent, "name", None) == "Property Issue Detector")
+                in_tool_arg = filtering_needed
+                tool_arg_buffer = ""
+                bracket_level = 0
+                async for event in result.stream_events():
+                    if event.type == "raw_response_event" and hasattr(event.data, "delta"):
+                        delta = event.data.delta
+                        # --- Begin: agent switch logic ---
+                        event_agent = None
+                        if hasattr(event.data, "agent"):
+                            event_agent = getattr(event.data, "agent", None)
+                        elif hasattr(event, "agent"):
+                            event_agent = getattr(event, "agent", None)
+                        if event_agent and hasattr(event_agent, "name"):
+                            event_agent_name = event_agent.name
+                        elif event_agent:
+                            event_agent_name = str(event_agent)
+                        else:
+                            event_agent_name = agent_name
+                        # --- End: agent switch logic ---
+                        if in_tool_arg:
+                            tool_arg_buffer += delta
+                            for ch in delta:
+                                if ch == '{':
+                                    bracket_level += 1
+                                elif ch == '}':
+                                    bracket_level -= 1
+                            if bracket_level <= 0 and 'user_description' in tool_arg_buffer:
+                                in_tool_arg = False
+                                tool_arg_buffer = ""
+                            continue
+                        yield f"data: {json.dumps({'delta': delta, 'agent': event_agent_name})}\n\n"
+                    if getattr(event, "is_last", False):
+                        yield "event: end\ndata: {}\n\n"
+
+        return StreamingHttpResponse(
+            event_stream(), content_type='text/event-stream'
+        )

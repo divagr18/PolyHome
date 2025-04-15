@@ -29,7 +29,7 @@ export default {
       },
     },
   },
-  plugins: [],
+  plugins: [require('@tailwindcss/typography')],
   safelist: [
     'bg-blue-100',
     'text-blue-800',
