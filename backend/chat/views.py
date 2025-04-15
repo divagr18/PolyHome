@@ -64,7 +64,7 @@ def analyze_property_image_tool(user_description: str) -> str:
                         "Identify the likely issue (e.g., water leak, mold, broken window, pest infestation). "
                         "Provide a brief assessment and suggest potential next steps."
                         "return markdown formatted output for chat, don't add extra line breaks"
-                        "start your answer with 'Property Issue Expert:'in bold , then continue the first answer sentence in the same line. Break line after."
+                        "start your answer with 'Property Issue Detector:'in bold , then continue the first answer sentence in the same line. Break line after."
 
 
 
