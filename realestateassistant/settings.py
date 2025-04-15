@@ -20,14 +20,14 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-#swu)(@1&_b&68)vl&smzvr-a#@o7l@iuv329&ga)sk459pyu)'
+SECRET_KEY = os.environ.get('SECRET_KEY', 'a-default-key-for-local-but-not-production') # Vercel will provide the real one
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.environ.get('DEBUG', 'False').lower() == 'true'
 
-ALLOWED_HOSTS = []
-
-
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '.vercel.app').split(',')
+STATIC_URL = '/static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles_build') # A dedicated build output folder
 # Application definition
 import os
 from dotenv import load_dotenv

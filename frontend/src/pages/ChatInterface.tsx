@@ -36,7 +36,6 @@ const AGENTS = [
 ];
 // --- END OF CORRECTION ---
 
-
 // Helper to find agent info by name (API returns "Property Issue Detector", etc.)
 function agentByName(name?: string) {
   if (!name) return undefined;
@@ -52,9 +51,9 @@ interface Message {
   isStreaming?: boolean;
   agentName?: string; // This will store the name like "Property Issue Detector"
 }
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/';
 
-const API_STREAM_URL = 'http://localhost:8000/api/multiagent/stream/'; // Ensure this is correct
-
+const API_STREAM_URL = `${API_BASE_URL}multiagent/stream/`;
 const ChatStreamInterface: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
@@ -261,7 +260,6 @@ const ChatStreamInterface: React.FC = () => {
          // setActiveAgent(null); // Keep the last active agent displayed? Or clear? User choice. Let's keep it displayed.
     }
 };
-
 
   // --- UI Handlers (Unchanged) ---
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) =>
