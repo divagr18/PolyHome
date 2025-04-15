@@ -25,7 +25,7 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'a-default-key-for-local-but-not-produ
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'False').lower() == 'true'
 
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '.vercel.app').split(',')
+ALLOWED_HOSTS = ["https://poly-home.vercel.app/"]
 STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles_build') # A dedicated build output folder
 # Application definition
@@ -60,7 +60,6 @@ MIDDLEWARE = [
 ]
 
 ROOT_URLCONF = 'realestateassistant.urls'
-CORS_ALLOW_ALL_ORIGINS = True #DO NOT USE IN PRODUCTION
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
@@ -76,6 +75,7 @@ TEMPLATES = [
         },
     },
 ]
+CORS_ALLOWED_ORIGINS=["https://poly-home.vercel.app/"]
 USE_TZ = True  # Enable timezone awareness
 TIME_ZONE = 'UTC'
 WSGI_APPLICATION = 'realestateassistant.wsgi.application'
