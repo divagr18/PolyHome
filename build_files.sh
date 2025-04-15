@@ -1,34 +1,33 @@
-*   **`build_vercel.sh`:**
-    ```bash
-    #!/bin/bash
+#!/bin/bash
 
-    # Exit immediately if a command exits with a non-zero status.
-    set -e
+# Exit immediately if a command exits with a non-zero status.
+set -e
 
-    echo "=== Starting Vercel Build Script ==="
+echo "=== Starting Vercel Build Script ==="
 
-    # 1. Build Frontend
-    echo "Building frontend..."
-    # Navigate to frontend, install deps, build, return to root
-    cd frontend
-    npm install
-    npm run build
-    cd ..
+# 1. Build Frontend
+echo "Building frontend..."
+cd frontend
+npm install
+npm run build
+cd ..
+echo "Frontend build complete. Output at frontend/dist/"
 
-    # 2. Install Backend Dependencies (using the Python version specified for Vercel)
-    echo "Installing Python dependencies..."
-    # Use python3.9 as specified in your vercel.json runtime
-    python3.9 -m venv venv
-    source venv/bin/activate
-    pip install --upgrade pip
-    pip install -r backend/requirements.txt
+# 2. Install Backend Dependencies
+echo "Installing Python dependencies..."
+# Ensure Vercel provides python3.9 in the build environment
+python3.9 -m venv venv
+source venv/bin/activate
+pip install --upgrade pip
+pip install -r backend/requirements.txt
+echo "Python dependencies installed."
 
-    # 3. Collect Django Static Files
-    echo "Collecting Django static files..."
-    # Run collectstatic from the root, targeting the backend manage.py
-    # Ensure STATIC_ROOT is configured correctly in settings.py
-    # This command assumes STATIC_ROOT is set, e.g., to 'staticfiles'
-    python backend/manage.py collectstatic --noinput --clear
+# 3. Collect Django Static Files
+echo "Collecting Django static files..."
+# Ensure STATIC_ROOT is set in settings.py (e.g., BASE_DIR / '..' / 'staticfiles')
+# Run manage.py using the virtual environment's python
+venv/bin/python backend/manage.py collectstatic --noinput --clear
+echo "Collect static complete. Files in staticfiles/ (or your STATIC_ROOT)"
 
-    echo "Build complete!"
-    ```
+
+echo "Build script finished!"
