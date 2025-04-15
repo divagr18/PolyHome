@@ -64,7 +64,7 @@ def analyze_property_image_tool(user_description: str) -> str:
                         "Identify the likely issue (e.g., water leak, mold, broken window, pest infestation). "
                         "Provide a brief assessment and suggest potential next steps."
                         "return markdown formatted output for chat, don't add extra line breaks"
-                        "start your answer with 'Property Issue Expert:', then continue answer in the same line"
+                        "start your answer with 'Property Issue Expert:'in bold , then continue the first answer sentence in the same line. Break line after."
 
 
 
@@ -107,7 +107,7 @@ issue_detector_agent = Agent[ChatContext](
         "If there is no new image, analyze the issue using the text description and conversation history. "
         "Do not add excess line breaks"
         "Provide a brief assessment and suggest next steps. Respond in Markdown."
-        "start your answer with 'Property Issue Expert:', then continue answer in the same line"
+        "start your answer with 'Property Issue Expert:'in bold , then continue the first answer sentence in the same line. Break line after."
     ),
     model="gpt-4o",
     tools=[analyze_property_image_tool]
@@ -125,7 +125,7 @@ faq_agent = Agent[ChatContext](
         "Consider the location of the user when giving advice, if mentioned in the history or query. "
         "Do not add excess line breaks"
         "Respond clearly in Markdown."
-        "start your answer with 'Tenancy Agreement Expert:', then continue answer in the same line"
+        "start your answer with 'Tenancy Agreement Expert:'in bold , then continue the first answer sentence in the same line. Break line after."
 
     ),
     model="gpt-4o-mini",
