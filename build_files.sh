@@ -3,10 +3,6 @@ set -e
 
 echo "=== Starting build_files.sh ==="
 
-# FRONTEND - Build the frontend using npm/yarn in frontend folder
-echo "Building frontend..."
-cd frontend
-
 # Install frontend deps (optional if cached)
 npm install
 
