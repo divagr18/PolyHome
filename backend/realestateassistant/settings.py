@@ -75,7 +75,7 @@ TEMPLATES = [
         },
     },
 ]
-CORS_ALLOWED_ORIGINS=["https://poly-home.vercel.app/"]
+CORS_ALLOWED_ORIGINS=['https://poly-home.vercel.app/','polyhome-backend.onrender.com']
 USE_TZ = True  # Enable timezone awareness
 TIME_ZONE = 'UTC'
 WSGI_APPLICATION = 'realestateassistant.wsgi.application'
