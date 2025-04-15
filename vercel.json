@@ -31,14 +31,17 @@
     },
     {
       "src": "/api/(.*)",
-      "dest": "backend/realestateassistant/wsgi.py"
+      "dest": "/backend/realestateassistant/wsgi.py"
     },
     {
       "handle": "filesystem"
     },
     {
       "src": "/(.*)",
-      "dest": "/frontend/dist/index.html"
+      "dest": "frontend/dist/index.html"
     }
-  ]
+  ],
+  "env": {
+    "DJANGO_SETTINGS_MODULE": "realestateassistant.settings"
+  }
 }
