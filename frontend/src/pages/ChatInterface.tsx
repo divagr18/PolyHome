@@ -240,7 +240,7 @@ const ChatStreamInterface: React.FC = () => {
 
     } catch (e: any) {
         // ... error handling ...
-        console.error("Error during SSE fetch:", e);
+        console.error("Error during SSE-fetch:", e);
         setMessages(prev => [
             ...prev.filter((m) => m.id !== agentId), // Remove placeholder
             {
